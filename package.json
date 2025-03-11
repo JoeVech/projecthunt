@@ -1,0 +1,11 @@
+{
+  "name": "ar-wildlife-game",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel --prod"
+  },
+  "dependencies": {
+    "vercel": "^28.0.0"
+  }
+}

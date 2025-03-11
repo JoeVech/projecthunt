@@ -1,0 +1,42 @@
+body {
+    margin: 0;
+    overflow: hidden;
+    background: #000;
+    touch-action: none;
+    font-family: Arial, sans-serif;
+}
+
+.loader {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    text-align: center;
+    z-index: 1000;
+}
+
+.tg-button {
+    padding: 15px 30px;
+    font-size: 18px;
+    background: #0088cc;
+    color: white;
+    border: none;
+    border-radius: 25px;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+    .tg-button:active {
+        transform: scale(0.95);
+    }
+
+#status {
+    margin-top: 20px;
+    font-size: 14px;
+    opacity: 0.8;
+}
+
+.hidden {
+    display: none !important;
+}
