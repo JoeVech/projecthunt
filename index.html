@@ -2,26 +2,16 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>AR Camera Fix</title>
+    <title>AR Camera Final</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
-    <!-- 1. Подключаем A-Frame ПЕРВЫМ -->
+    <!-- Content Security Policy для блокировки расширений -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' cdn.jsdelivr.net aframe.io; script-src 'self' 'unsafe-inline' 'unsafe-eval' cdn.jsdelivr.net aframe.io; connect-src 'self' blob:;">
+    
+    <!-- Порядок подключения важен! -->
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
-    
-    <!-- 2. Затем AR.js -->
-    <script src="https://cdn.jsdelivr.net/npm/@ar-js-org/ar.js@3.3.0/aframe/build/aframe-ar.min.js"></script>
-    
-    <!-- 3. Блокируем Web3 API -->
-    <script>
-        window.addEventListener('load', () => {
-            delete window.ethereum;
-            delete window.web3;
-            Object.defineProperty(window, 'ethereum', { get: () => undefined });
-            Object.defineProperty(window, 'web3', { get: () => undefined });
-            console.log('Web3 API blocked');
-        });
-    </script>
-    
+    <script src="https://cdn.jsdelivr.net/npm/@ar-js-org/ar.js@3.4.0/aframe/build/aframe-ar.min.js"></script>
+
     <style>
         body { margin: 0; overflow: hidden; }
         .arjs-loader {
@@ -32,14 +22,15 @@
             color: white;
             font-family: Arial;
             z-index: 1000;
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border-radius: 10px;
         }
     </style>
 </head>
 <body>
-    <!-- 4. Индикатор загрузки -->
     <div class="arjs-loader">Инициализация AR...</div>
     
-    <!-- 5. Сцена должна быть ПОСЛЕ скриптов -->
     <a-scene 
         vr-mode-ui="enabled: false"
         embedded 
@@ -66,32 +57,58 @@
     </a-scene>
 
     <script>
-        // 6. Проверяем загрузку библиотек
-        if (!window.AFRAME) {
-            document.querySelector('.arjs-loader').innerHTML = 
-                'Ошибка: A-Frame не загружен';
-            throw new Error('A-Frame not loaded');
-        }
+        (function() { // Изолируем область видимости
+            // Агрессивная блокировка Web3 API
+            const disableWeb3 = () => {
+                delete window.ethereum;
+                delete window.web3;
+                delete window.BinanceChain;
+                Object.defineProperties(window, {
+                    ethereum: { get: () => undefined },
+                    web3: { get: () => undefined },
+                    BinanceChain: { get: () => undefined }
+                });
+            };
+            
+            disableWeb3();
+            setInterval(disableWeb3, 1000);
 
-        if (!window.ARjs) {
-            document.querySelector('.arjs-loader').innerHTML = 
-                'Ошибка: AR.js не загружен';
-            throw new Error('AR.js not loaded');
-        }
+            // Инициализация сцены
+            document.querySelector('a-scene').addEventListener('loaded', () => {
+                document.querySelector('.arjs-loader').style.display = 'none';
+                
+                // Принудительная инициализация видео
+                const video = document.querySelector('video');
+                if(video) {
+                    video.style.position = 'fixed';
+                    video.style.top = '0';
+                    video.style.left = '0';
+                    video.style.width = '100%';
+                    video.style.height = '100%';
+                    video.style.zIndex = '-1';
+                }
+            });
 
-        // 7. Инициализация сцены
-        document.querySelector('a-scene').addEventListener('loaded', () => {
-            document.querySelector('.arjs-loader').style.display = 'none';
-            console.log('AR-сцена инициализирована');
-        });
+            // Обработка ошибок
+            window.addEventListener('arjs-source-error', (error) => {
+                console.error('AR Error:', error.detail.error);
+                document.querySelector('.arjs-loader').innerHTML = `
+                    Ошибка AR:<br>
+                    ${error.detail.error.message}<br>
+                    Попробуйте:<br>
+                    1. Перезагрузить страницу<br>
+                    2. Проверить разрешения камеры<br>
+                    3. Отключить все расширения
+                `;
+            });
 
-        // 8. Интеграция с Telegram
-        if (typeof Telegram !== 'undefined') {
-            Telegram.WebApp.ready();
-            Telegram.WebApp.expand();
-        } else {
-            console.warn('Telegram WebApp API не найден');
-        }
+            // Инициализация Telegram Web App
+            if(typeof Telegram !== 'undefined') {
+                Telegram.WebApp.ready();
+                Telegram.WebApp.expand();
+                Telegram.WebApp.enableClosingConfirmation();
+            }
+        })();
     </script>
 </body>
 </html>
