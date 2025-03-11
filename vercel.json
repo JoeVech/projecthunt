@@ -1,19 +1,30 @@
 {
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/public/index.html"
-    }
-  ],
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
+    "version": 2,
+    "builds": [
         {
-          "key": "Cache-Control",
-          "value": "public, max-age=3600"
+            "src": "public/**",
+            "use": "@vercel/static"
         }
-      ]
-    }
-  ]
+    ],
+    "routes": [
+        {
+            "src": "/(.*)",
+            "dest": "/public/index.html"
+        }
+    ],
+    "headers": [
+        {
+            "source": "/(.*)",
+            "headers": [
+                {
+                    "key": "Cache-Control",
+                    "value": "public, max-age=3600"
+                },
+                {
+                    "key": "Content-Security-Policy",
+                    "value": "default-src 'self' 'unsafe-inline' data: blob:; script-src 'self' 'unsafe-inline' cdn.jsdelivr.net aframe.io cdnjs.cloudflare.com unpkg.com; connect-src 'self' data: blob:; media-src 'self' blob: data:; style-src 'self' 'unsafe-inline';"
+                }
+            ]
+        }
+    ]
 }
