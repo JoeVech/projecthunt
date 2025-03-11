@@ -2,18 +2,23 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>AR Camera Final</title>
+    <title>AR Звери</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
-    <!-- Content Security Policy для блокировки расширений -->
+    <!-- Content Security Policy -->
     <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' cdn.jsdelivr.net aframe.io; script-src 'self' 'unsafe-inline' 'unsafe-eval' cdn.jsdelivr.net aframe.io; connect-src 'self' blob:;">
     
-    <!-- Порядок подключения важен! -->
+    <!-- AR зависимости -->
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@ar-js-org/ar.js@3.4.0/aframe/build/aframe-ar.min.js"></script>
 
     <style>
-        body { margin: 0; overflow: hidden; }
+        body { 
+            margin: 0; 
+            overflow: hidden;
+            background: #000;
+        }
+        
         .arjs-loader {
             position: fixed;
             top: 50%;
@@ -26,47 +31,73 @@
             padding: 20px;
             border-radius: 10px;
         }
+        
+        #status {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-family: Arial;
+            z-index: 1001;
+            background: rgba(0,0,0,0.7);
+            padding: 10px;
+            border-radius: 5px;
+        }
     </style>
 </head>
 <body>
     <div class="arjs-loader">Инициализация AR...</div>
-    
+    <div id="status">Поиск плоскостей...</div>
+
     <a-scene 
         vr-mode-ui="enabled: false"
         embedded 
         arjs="sourceType: webcam; debugUIEnabled: false; trackingMethod: best;"
         renderer="logarithmicDepthBuffer: true;"
     >
-        <a-camera gps-camera rotation-reader></a-camera>
-        
-        <!-- Тестовый объект -->
-        <a-box 
-            position="0 0 -2" 
-            material="color: #4CAF50" 
-            scale="0.5 0.5 0.5"
+        <a-camera 
+            gps-camera 
+            rotation-reader
+            wasd-controls-enabled="false"
+        ></a-camera>
+
+        <!-- Пример зверя -->
+        <a-entity 
             arjs-anchor="detectedPlanes: true;"
             visible="false"
         >
+            <a-box 
+                position="0 0.5 0"
+                color="#4CAF50"
+                scale="0.5 0.5 0.5"
+            ></a-box>
+            <a-text 
+                value="Лесной зверь"
+                position="0 1.2 0"
+                align="center"
+                color="#FFF"
+                scale="2 2 2"
+            ></a-text>
             <a-animation 
                 attribute="rotation"
                 to="0 360 0"
                 dur="5000"
-                repeat="indefinite">
-            </a-animation>
-        </a-box>
+                repeat="indefinite"
+            ></a-animation>
+        </a-entity>
     </a-scene>
 
     <script>
-        (function() { // Изолируем область видимости
-            // Агрессивная блокировка Web3 API
+        (function() {
+            // Блокировка Web3 API
             const disableWeb3 = () => {
-                delete window.ethereum;
-                delete window.web3;
-                delete window.BinanceChain;
-                Object.defineProperties(window, {
-                    ethereum: { get: () => undefined },
-                    web3: { get: () => undefined },
-                    BinanceChain: { get: () => undefined }
+                const props = ['ethereum', 'web3', 'BinanceChain'];
+                props.forEach(prop => delete window[prop]);
+                props.forEach(prop => {
+                    Object.defineProperty(window, prop, {
+                        get: () => undefined,
+                        configurable: false
+                    });
                 });
             };
             
@@ -75,39 +106,45 @@
 
             // Инициализация сцены
             document.querySelector('a-scene').addEventListener('loaded', () => {
-                document.querySelector('.arjs-loader').style.display = 'none';
+                const loader = document.querySelector('.arjs-loader');
+                const status = document.getElementById('status');
                 
-                // Принудительная инициализация видео
+                loader.style.display = 'none';
+                status.textContent = 'Ищите плоскости поверхностей!';
+
+                // Настройка видео
                 const video = document.querySelector('video');
                 if(video) {
+                    video.style.transform = 'scaleX(1)';
                     video.style.position = 'fixed';
-                    video.style.top = '0';
-                    video.style.left = '0';
-                    video.style.width = '100%';
-                    video.style.height = '100%';
-                    video.style.zIndex = '-1';
+                    video.style.objectFit = 'cover';
                 }
             });
 
-            // Обработка ошибок
-            window.addEventListener('arjs-source-error', (error) => {
-                console.error('AR Error:', error.detail.error);
-                document.querySelector('.arjs-loader').innerHTML = `
-                    Ошибка AR:<br>
-                    ${error.detail.error.message}<br>
-                    Попробуйте:<br>
-                    1. Перезагрузить страницу<br>
-                    2. Проверить разрешения камеры<br>
-                    3. Отключить все расширения
-                `;
+            // Обработка событий AR
+            window.addEventListener('arjs-anchor-clicked', (event) => {
+                console.log('Зверь пойман!', event.detail.target);
+                // Здесь можно добавить логику поимки зверя
             });
 
-            // Инициализация Telegram Web App
+            // Интеграция с Telegram
             if(typeof Telegram !== 'undefined') {
                 Telegram.WebApp.ready();
                 Telegram.WebApp.expand();
                 Telegram.WebApp.enableClosingConfirmation();
+                
+                // Оптимизация для мобильных устройств
+                if(Telegram.WebApp.isExpanded) {
+                    document.documentElement.style.height = '100%';
+                    document.body.style.height = '100%';
+                }
             }
+
+            // Автоматический ресайз
+            window.addEventListener('resize', () => {
+                const scene = document.querySelector('a-scene');
+                if(scene) scene.emit('resize');
+            });
         })();
     </script>
 </body>
