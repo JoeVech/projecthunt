@@ -1,96 +1,81 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>AR Camera</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>GeoHunter</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <style>
-        /* Полноэкранные стили */
-        body { 
-            margin: 0; 
-            overflow: hidden;
-            background: #000;
+        body {
+            margin: 0;
+            padding: 0;
         }
-        
-        #arScene {
-            width: 100vw;
+        #map {
             height: 100vh;
-            position: fixed;
-            top: 0;
-            left: 0;
+            width: 100vw;
         }
-
-        .loader {
+        .refresh-btn {
             position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: white;
-            font-family: Arial;
-            text-align: center;
+            bottom: 20px;
+            right: 20px;
             z-index: 1000;
+            padding: 12px 20px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            cursor: pointer;
         }
     </style>
-
-    <!-- Блокировка Web3 расширений -->
-    <script>
-        (function() {
-            const disableWeb3 = () => {
-                delete window.ethereum;
-                delete window.web3;
-                Object.defineProperties(window, {
-                    ethereum: { get: () => undefined },
-                    web3: { get: () => undefined }
-                });
-            };
-            
-            if (document.readyState === 'complete') disableWeb3();
-            else window.addEventListener('load', disableWeb3);
-        })();
-    </script>
-
-    <!-- Библиотеки -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.2.0/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@ar-js-org/ar.js@3.4.0/aframe/build/aframe-ar.min.js"></script>
 </head>
 <body>
-    <div class="loader" id="loader">Инициализация AR...</div>
-    
-    <a-scene 
-        id="arScene"
-        vr-mode-ui="enabled: false"
-        embedded 
-        arjs="sourceType: webcam; debugUIEnabled: false;"
-    >
-        <a-camera gps-camera rotation-reader></a-camera>
-        <a-box position="0 0 -2" color="#4CC3D9" scale="0.5 0.5 0.5"></a-box>
-    </a-scene>
+    <div id="map"></div>
+    <button class="refresh-btn" onclick="updatePosition()">🔄 Обновить</button>
 
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        // Инициализация только внутри Telegram Web App
-        if (typeof Telegram !== 'undefined' && Telegram.WebApp) {
-            Telegram.WebApp.ready();
-            Telegram.WebApp.expand();
+        // Инициализация карты
+        let map;
+        let playerMarker;
+        
+        function initMap(lat, lon) {
+            map = L.map('map').setView([lat, lon], 15);
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '© OpenStreetMap'
+            }).addTo(map);
+
+            // Маркер игрока
+            playerMarker = L.marker([lat, lon], {
+                icon: L.icon({
+                    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+                    iconSize: [25, 41],
+                    iconAnchor: [12, 41]
+                })
+            }).addTo(map);
         }
 
-        // Обработка загрузки сцены
-        document.querySelector('a-scene').addEventListener('loaded', () => {
-            document.getElementById('loader').style.display = 'none';
-        });
-
-        // Обработка ошибок камеры
-        navigator.mediaDevices.getUserMedia({ video: true })
-            .catch(error => {
-                const loader = document.getElementById('loader');
-                loader.innerHTML = `
-                    <div style="color: red">
-                        Ошибка доступа к камере!<br>
-                        ${error.name}: ${error.message}<br>
-                        Пожалуйста:<br>
-                        1. Проверьте разрешения<br>
-                        2. Перезагрузите страницу
-                    </div>
-                `;
+        // Обновление позиции
+        function updatePosition() {
+            navigator.geolocation.getCurrentPosition(pos => {
+                const {latitude, longitude} = pos.coords;
+                map.setView([latitude, longitude], 15);
+                playerMarker.setLatLng([latitude, longitude]);
+            }, error => {
+                alert(`Ошибка: ${error.message}`);
             });
+        }
+
+        // Инициализация при загрузке
+        Telegram.WebApp.ready();
+        navigator.geolocation.getCurrentPosition(pos => {
+            initMap(pos.coords.latitude, pos.coords.longitude);
+        }, error => {
+            // Fallback для тестирования
+            initMap(44.9482, 34.1003); // Координаты Симферополя
+            alert('Геолокация отключена. Используем тестовые координаты.');
+        });
     </script>
 </body>
 </html>
