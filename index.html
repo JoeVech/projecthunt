@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Camera Test</title>
+    <title>AR Camera Fixed</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body { 
@@ -13,10 +13,9 @@
             position: fixed;
             top: 0;
             left: 0;
-            width: 100vw;
-            height: 100vh;
+            width: 100%;
+            height: 100%;
             object-fit: cover;
-            transform: scaleX(-1); /* Зеркальное отображение */
         }
         #status {
             position: fixed;
@@ -32,45 +31,32 @@
     </style>
 </head>
 <body>
-    <div id="status">Проверка камеры...</div>
+    <div id="status">Камера активна ✅</div>
     <video id="videoContainer" autoplay playsinline muted></video>
 
     <script>
-        // Явно задаем стили для видео
         const video = document.getElementById('videoContainer');
-        video.style.display = 'block';
-        video.style.visibility = 'visible';
+        
+        // Явно отключаем зеркальное отображение
+        video.style.transform = 'scaleX(1)';
 
-        // Получаем поток с камеры
         navigator.mediaDevices.getUserMedia({
             video: {
-                facingMode: 'environment',
+                facingMode: 'environment', // Используем заднюю камеру
                 width: { ideal: 1280 },
                 height: { ideal: 720 }
             }
         }).then(stream => {
             video.srcObject = stream;
-            video.onloadedmetadata = () => {
-                video.play().catch(error => {
-                    document.getElementById('status').innerHTML = 
-                        'Ошибка воспроизведения: ' + error.message;
-                });
-            };
+            video.onloadedmetadata = () => video.play();
         }).catch(error => {
             document.getElementById('status').innerHTML = 
-                'Ошибка камеры: ' + error.name;
+                'Ошибка: ' + error.message;
         });
 
-        // Принудительное обновление видео
-        setTimeout(() => {
-            video.style.transform = 'scaleX(-1)'; // Перезапускаем рендеринг
-        }, 1000);
-
-        // Интеграция с Telegram
         if (typeof Telegram !== 'undefined') {
             Telegram.WebApp.ready();
             Telegram.WebApp.expand();
-            Telegram.WebApp.enableClosingConfirmation();
         }
     </script>
 </body>
