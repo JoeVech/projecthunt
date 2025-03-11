@@ -4,13 +4,19 @@
     <title>Camera Test</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        body { margin: 0; overflow: hidden; }
+        body { 
+            margin: 0; 
+            overflow: hidden;
+            background: #000;
+        }
         #videoContainer {
-            width: 100vw;
-            height: 100vh;
             position: fixed;
             top: 0;
             left: 0;
+            width: 100vw;
+            height: 100vh;
+            object-fit: cover;
+            transform: scaleX(-1); /* Зеркальное отображение */
         }
         #status {
             position: fixed;
@@ -27,56 +33,44 @@
 </head>
 <body>
     <div id="status">Проверка камеры...</div>
-    <video id="video" autoplay playsinline></video>
+    <video id="videoContainer" autoplay playsinline muted></video>
 
     <script>
-        // Шаг 1: Проверка поддержки медиаустройств
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            document.getElementById('status').innerHTML = 
-                'Ваш браузер не поддерживает доступ к камере. Попробуйте Chrome или Safari';
-            throw new Error('Camera API not supported');
-        }
+        // Явно задаем стили для видео
+        const video = document.getElementById('videoContainer');
+        video.style.display = 'block';
+        video.style.visibility = 'visible';
 
-        // Шаг 2: Получение доступа к камере
+        // Получаем поток с камеры
         navigator.mediaDevices.getUserMedia({
             video: {
-                facingMode: 'environment', // Используем заднюю камеру
+                facingMode: 'environment',
                 width: { ideal: 1280 },
                 height: { ideal: 720 }
             }
         }).then(stream => {
-            // Шаг 3: Отображение видеопотока
-            const video = document.getElementById('video');
             video.srcObject = stream;
             video.onloadedmetadata = () => {
-                video.play();
-                document.getElementById('status').innerHTML = 
-                    'Камера работает! 🎥<br>Разрешение: ' + 
-                    video.videoWidth + 'x' + video.videoHeight;
+                video.play().catch(error => {
+                    document.getElementById('status').innerHTML = 
+                        'Ошибка воспроизведения: ' + error.message;
+                });
             };
         }).catch(error => {
-            // Шаг 4: Обработка ошибок
-            let errorMessage = 'Ошибка доступа к камере: ';
-            switch(error.name) {
-                case 'NotAllowedError':
-                    errorMessage += 'Вы запретили доступ к камере';
-                    break;
-                case 'NotFoundError':
-                    errorMessage += 'Камера не найдена';
-                    break;
-                case 'NotReadableError':
-                    errorMessage += 'Камера используется другим приложением';
-                    break;
-                default:
-                    errorMessage += error.message;
-            }
-            document.getElementById('status').innerHTML = errorMessage;
+            document.getElementById('status').innerHTML = 
+                'Ошибка камеры: ' + error.name;
         });
 
-        // Шаг 5: Проверка интеграции с Telegram
+        // Принудительное обновление видео
+        setTimeout(() => {
+            video.style.transform = 'scaleX(-1)'; // Перезапускаем рендеринг
+        }, 1000);
+
+        // Интеграция с Telegram
         if (typeof Telegram !== 'undefined') {
             Telegram.WebApp.ready();
             Telegram.WebApp.expand();
+            Telegram.WebApp.enableClosingConfirmation();
         }
     </script>
 </body>
