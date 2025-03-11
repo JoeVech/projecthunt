@@ -5,21 +5,17 @@
     <title>AR Звери</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     
-    <!-- Обновленный CSP для Telegram -->
+    <!-- Обновленный CSP -->
     <meta http-equiv="Content-Security-Policy" content="
         default-src 'self' 'unsafe-inline' 'unsafe-eval' blob: data:;
         script-src 'self' 'unsafe-inline' 'unsafe-eval' cdn.jsdelivr.net aframe.io;
         connect-src 'self' blob: data:;
         media-src 'self' blob: data:;
         style-src 'self' 'unsafe-inline';
-        img-src 'self' blob: data:;
     ">
     
-    <!-- AR зависимости -->
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@ar-js-org/ar.js@3.4.0/aframe/build/aframe-ar-nft.min.js"></script>
-    
-    <!-- Официальный SDK Telegram -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
     <style>
@@ -27,7 +23,6 @@
             margin: 0;
             background: #000;
             touch-action: none;
-            -webkit-touch-callout: none;
         }
         
         #cameraOverlay {
@@ -47,145 +42,113 @@
             left: 50%;
             transform: translate(-50%, -50%);
             color: white;
-            font-family: Arial;
             text-align: center;
             z-index: 1000;
+        }
+        
+        #startButton {
+            padding: 15px 30px;
+            font-size: 18px;
+            background: #0088cc;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: opacity 0.3s;
         }
     </style>
 </head>
 <body>
     <div class="arjs-loader">
-        <div id="status">Инициализация...</div>
-        <button id="startButton" style="display: none; margin-top: 20px; padding: 12px 24px; background: #0088cc; color: white; border: none; border-radius: 25px;">
-            Старт AR
-        </button>
+        <div id="status">Для начала нажмите кнопку ниже</div>
+        <button id="startButton">Активировать AR-камеру</button>
     </div>
 
     <video id="cameraOverlay" autoplay muted playsinline></video>
 
-    <a-scene 
-        vr-mode-ui="enabled: false"
-        embedded 
-        arjs="sourceType: webcam; debugUIEnabled: false; trackingMethod: best;"
-        renderer="logarithmicDepthBuffer: true; precision: medium;"
-        device-orientation-permission-ui="enabled: false"
-    >
-        <a-camera 
-            id="arCamera"
-            gps-camera 
-            rotation-reader 
-            cursor="rayOrigin: mouse"
-            wasd-controls-enabled="false"
-        ></a-camera>
-        
+    <a-scene vr-mode-ui="enabled: false" embedded arjs renderer="logarithmicDepthBuffer: true;">
+        <a-camera id="arCamera" gps-camera rotation-reader></a-camera>
         <!-- Модель зверя -->
         <a-entity id="animal" arjs-anchor="detectedPlanes: true;" visible="false">
             <a-box position="0 0.5 0" color="#4CAF50" scale="0.5 0.5 0.5"></a-box>
-            <a-text value="Дикий зверь!" position="0 1.2 0" align="center" color="#FFF" scale="1.5 1.5 1.5"></a-text>
-            <a-animation attribute="rotation" to="0 360 0" dur="5000" repeat="indefinite"></a-animation>
         </a-entity>
     </a-scene>
 
     <script>
         (function() {
             const tg = window.Telegram?.WebApp;
-            const video = document.getElementById('cameraOverlay');
             const startButton = document.getElementById('startButton');
             const status = document.getElementById('status');
             
-            // 1. Инициализация Telegram Web App
+            // Инициализация Telegram Web App
             if(tg) {
                 tg.ready();
                 tg.expand();
                 tg.enableClosingConfirmation();
-                
-                // Запрашиваем необходимые разрешения
-                tg.requestWriteAccess().catch(() => {});
-                tg.requestContact().catch(() => {});
             }
 
-            // 2. Функция активации камеры
-            async function startCamera() {
+            // Блокировка автоматического запуска камеры
+            let isCameraStarted = false;
+
+            // Обработчик клика по кнопке
+            startButton.addEventListener('click', async () => {
+                if(isCameraStarted) return;
+                isCameraStarted = true;
+                
+                startButton.style.opacity = '0.5';
+                startButton.disabled = true;
+                status.textContent = 'Запрос доступа к камере...';
+
                 try {
-                    status.textContent = 'Запрос доступа к камере...';
-                    
-                    // Явный запрос через пользовательский жест
                     const stream = await navigator.mediaDevices.getUserMedia({
                         video: {
                             facingMode: 'environment',
-                            width: { ideal: 1920 },
-                            height: { ideal: 1080 },
-                            frameRate: { ideal: 60 }
+                            width: { ideal: 1280 },
+                            height: { ideal: 720 }
                         }
                     });
 
-                    // Для iOS: принудительное воспроизведение видео
-                    video.playsInline = true;
-                    video.muted = true;
-                    video.srcObject = stream;
-                    
-                    await new Promise(resolve => video.onloadedmetadata = resolve);
-                    await video.play();
-
-                    // 3. Инициализация AR после успешного старта видео
-                    initARScene(stream);
+                    await initAR(stream);
+                    document.querySelector('.arjs-loader').style.display = 'none';
                     
                 } catch(error) {
-                    status.innerHTML = `Ошибка: ${error.name}<br>${error.message}`;
-                    startButton.style.display = 'block';
+                    status.innerHTML = `Ошибка: ${error.name}<br>${emojifyError(error)}`;
+                    startButton.style.opacity = '1';
+                    startButton.disabled = false;
+                    isCameraStarted = false;
                 }
-            }
+            });
 
-            // 4. Настройка AR сцены
-            function initARScene(stream) {
+            // Инициализация AR
+            async function initAR(stream) {
+                const video = document.getElementById('cameraOverlay');
+                video.srcObject = stream;
+                
+                await new Promise(resolve => {
+                    video.onloadedmetadata = resolve;
+                    video.play();
+                });
+
                 const scene = document.querySelector('a-scene');
+                scene.systems['arjs']._arAnchorSystem.configuration.source = video;
+                scene.systems['arjs']._arAnchorSystem.start();
                 
-                // Перехватываем видеопоток для AR.js
-                const arSystem = scene.systems['arjs'];
-                arSystem._arAnchorSystem.configuration.sourceParameters.source = video;
-                arSystem._arAnchorSystem.configuration.sourceParameters.sourceType = 'video';
-                
-                // Перезапускаем систему AR
-                arSystem._arAnchorSystem.stop();
-                arSystem._arAnchorSystem.start();
-                
-                // Событие успешной загрузки
-                scene.addEventListener('loaded', () => {
-                    document.querySelector('.arjs-loader').style.display = 'none';
-                    status.textContent = 'Наведите камеру на плоскую поверхность';
-                });
-
-                // Обработчик обнаружения плоскости
-                scene.addEventListener('arjs-plane-detected', () => {
-                    document.getElementById('animal').setAttribute('visible', 'true');
-                });
+                // Обновление статуса
+                status.textContent = 'Ищем плоскости...';
             }
 
-            // 5. Запуск по кнопке (требование WebView)
-            startButton.addEventListener('click', () => {
-                startButton.style.display = 'none';
-                startCamera();
-            });
-
-            // 6. Автоматический запуск для десктопов
-            if(!tg || navigator.userAgent.match(/(iPad|iPhone|iPod|Android)/gi)) {
-                startButton.style.display = 'block';
-            } else {
-                startCamera();
+            // Обработка ошибок
+            function emojifyError(error) {
+                const errors = {
+                    'NotAllowedError': '🚫 Доступ к камере запрещен',
+                    'NotFoundError': '📷 Камера не найдена',
+                    'NotReadableError': '⚠️ Ошибка доступа к камере',
+                    'OverconstrainedError': '🔍 Неподдерживаемые параметры камеры',
+                    'SecurityError': '🛡️ Ошибка безопасности',
+                    'AbortError': '⏹️ Прервано пользователем'
+                };
+                return errors[error.name] || error.message;
             }
-
-            // 7. Обработчики жизненного цикла
-            document.addEventListener('visibilitychange', () => {
-                if(document.visibilityState === 'visible') {
-                    video.play().catch(() => location.reload());
-                }
-            });
-
-            window.addEventListener('beforeunload', () => {
-                if(video.srcObject) {
-                    video.srcObject.getTracks().forEach(track => track.stop());
-                }
-            });
         })();
     </script>
 </body>
