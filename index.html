@@ -1,86 +1,96 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>AR Camera Debug</title>
+    <meta charset="utf-8">
+    <title>AR Camera Fix</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- 1. Подключаем A-Frame ПЕРВЫМ -->
+    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+    
+    <!-- 2. Затем AR.js -->
+    <script src="https://cdn.jsdelivr.net/npm/@ar-js-org/ar.js@3.3.0/aframe/build/aframe-ar.min.js"></script>
+    
+    <!-- 3. Блокируем Web3 API -->
     <script>
-        // Блокировка Web3-расширений
         window.addEventListener('load', () => {
             delete window.ethereum;
             delete window.web3;
-            console.log('Web3 extensions blocked');
+            Object.defineProperty(window, 'ethereum', { get: () => undefined });
+            Object.defineProperty(window, 'web3', { get: () => undefined });
+            console.log('Web3 API blocked');
         });
     </script>
+    
     <style>
         body { margin: 0; overflow: hidden; }
-        #status {
+        .arjs-loader {
             position: fixed;
-            top: 10px;
-            left: 10px;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
             color: white;
             font-family: Arial;
             z-index: 1000;
-            background: rgba(0,0,0,0.7);
-            padding: 10px;
-            border-radius: 5px;
         }
     </style>
 </head>
 <body>
-    <div id="status">Инициализация...</div>
-    <a-scene embedded arjs="debugUIEnabled: true">
-        <a-camera></a-camera>
+    <!-- 4. Индикатор загрузки -->
+    <div class="arjs-loader">Инициализация AR...</div>
+    
+    <!-- 5. Сцена должна быть ПОСЛЕ скриптов -->
+    <a-scene 
+        vr-mode-ui="enabled: false"
+        embedded 
+        arjs="sourceType: webcam; debugUIEnabled: false; trackingMethod: best;"
+        renderer="logarithmicDepthBuffer: true;"
+    >
+        <a-camera gps-camera rotation-reader></a-camera>
+        
+        <!-- Тестовый объект -->
+        <a-box 
+            position="0 0 -2" 
+            material="color: #4CAF50" 
+            scale="0.5 0.5 0.5"
+            arjs-anchor="detectedPlanes: true;"
+            visible="false"
+        >
+            <a-animation 
+                attribute="rotation"
+                to="0 360 0"
+                dur="5000"
+                repeat="indefinite">
+            </a-animation>
+        </a-box>
     </a-scene>
 
-    <!-- Локальные версии библиотек -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.2.0/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@ar-js-org/ar.js@3.4.0/aframe/build/aframe-ar.min.js"></script>
-
     <script>
-        const status = document.getElementById('status');
-        const scene = document.querySelector('a-scene');
-
-        // Шаг 1: Проверка загрузки библиотек
-        console.log('AFrame version:', AFRAME.version);
-        console.log('AR.js version:', ARjs.version);
-        status.innerHTML += '<br>Библиотеки загружены';
-
-        // Шаг 2: Инициализация сцены
-        scene.addEventListener('loaded', () => {
-            console.log('Scene loaded');
-            status.innerHTML += '<br>Сцена инициализирована';
-            
-            // Шаг 3: Получение видео элемента
-            const video = document.querySelector('[arjs-video]');
-            if (video) {
-                console.log('Video element found');
-                video.style.position = 'fixed';
-                video.style.top = '0';
-                video.style.left = '0';
-                video.style.width = '100%';
-                video.style.height = '100%';
-                status.innerHTML += '<br>Видео настроено';
-            } else {
-                status.innerHTML += '<br>Ошибка: видео не найдено';
-            }
-        });
-
-        // Шаг 4: Обработка ошибок
-        scene.addEventListener('arjs-video-error', (error) => {
-            console.error('AR.js Error:', error.detail.error);
-            status.innerHTML += `<br>Ошибка: ${error.detail.error.message}`;
-        });
-
-        // Шаг 5: Проверка поддержки
-        if (!AFRAME.utils.isWebXRAvailable()) {
-            status.innerHTML += '<br>WebXR не поддерживается';
+        // 6. Проверяем загрузку библиотек
+        if (!window.AFRAME) {
+            document.querySelector('.arjs-loader').innerHTML = 
+                'Ошибка: A-Frame не загружен';
+            throw new Error('A-Frame not loaded');
         }
 
-        // Интеграция с Telegram
+        if (!window.ARjs) {
+            document.querySelector('.arjs-loader').innerHTML = 
+                'Ошибка: AR.js не загружен';
+            throw new Error('AR.js not loaded');
+        }
+
+        // 7. Инициализация сцены
+        document.querySelector('a-scene').addEventListener('loaded', () => {
+            document.querySelector('.arjs-loader').style.display = 'none';
+            console.log('AR-сцена инициализирована');
+        });
+
+        // 8. Интеграция с Telegram
         if (typeof Telegram !== 'undefined') {
             Telegram.WebApp.ready();
             Telegram.WebApp.expand();
-            console.log('Telegram WebApp initialized');
+        } else {
+            console.warn('Telegram WebApp API не найден');
         }
     </script>
 </body>
