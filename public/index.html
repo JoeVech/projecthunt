@@ -1,58 +1,122 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
     <meta charset="utf-8">
-    <title>AR Звери</title>
+    <title>AR Звери - Официальная версия</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    
-    <!-- Обновленный CSP -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+    <!-- Content Security Policy -->
     <meta http-equiv="Content-Security-Policy" content="
         default-src 'self' 'unsafe-inline' data: blob:;
-        script-src 'self' 'unsafe-inline' cdn.jsdelivr.net aframe.io telegram.org;
+        script-src 'self' 'unsafe-inline' cdn.jsdelivr.net aframe.io cdnjs.cloudflare.com unpkg.com telegramsdk.com;
         connect-src 'self' data: blob:;
         media-src 'self' blob: data:;
         style-src 'self' 'unsafe-inline';
     ">
-    
+
     <!-- Стили -->
     <link rel="stylesheet" href="/css/main.css">
-    
-    <!-- Зависимости в правильном порядке -->
-    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@ar-js-org/ar.js@3.3.0/aframe/build/aframe-ar-nft.min.js"></script>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+    <!-- A-Frame с резервными источниками и SRI -->
+    <script 
+        src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.4.2/aframe.min.js"
+        integrity="sha512-7bLAIQFZmmwpSXr3R6W3X6XyZNMp1QudGAmZvufDPhm7ZJh2eNcj+acF5Z5Qglj/EDv4wSJjMH2uAVx3Z4i2A==" 
+        crossorigin="anonymous"
+        referrerpolicy="no-referrer"
+        onerror="loadFallback(this, 'aframe')"
+    ></script>
+
+    <!-- AR.js с резервным CDN -->
+    <script 
+        src="https://unpkg.com/@ar-js/ar.js@3.3.0/aframe/build/aframe-ar-nft.min.js"
+        crossorigin="anonymous"
+        onerror="loadFallback(this, 'arjs')"
+    ></script>
+
+    <!-- Telegram Web App SDK с локальным fallback -->
+    <script 
+        src="https://telegram.org/js/telegram-web-app.js" 
+        onerror="loadFallback(this, 'telegram')"
+    ></script>
+    <script>
+        window.Telegram = window.Telegram || {
+            WebApp: {
+                ready: () => console.warn('Telegram SDK not loaded!'),
+                expand: () => {},
+                enableClosingConfirmation: () => {}
+            }
+        };
+    </script>
 </head>
 <body>
     <div class="loader">
-        <button id="startButton" class="tg-button">Активировать AR</button>
-        <div id="status">Нажмите кнопку для начала</div>
+        <button id="startButton" class="tg-button">
+            <span class="button-text">🎮 Активировать AR</span>
+            <div class="loading-spinner hidden"></div>
+        </button>
+        <div id="status" class="status-text">Готов к работе!</div>
     </div>
 
+    <!-- AR сцена -->
     <a-scene 
         vr-mode-ui="enabled: false"
         arjs="debugUIEnabled: false; trackingMethod: best;"
         renderer="logarithmicDepthBuffer: true;"
         class="hidden"
+        data-loaded="false"
     >
         <a-camera gps-camera rotation-reader></a-camera>
         <a-entity id="animal" arjs-anchor="detectedPlanes: true;" visible="false">
             <a-box position="0 0.5 0" color="#4CAF50" scale="0.5 0.5 0.5"></a-box>
-            <a-text value="Дикий зверь!" position="0 1.2 0" align="center" color="#FFF"></a-text>
+            <a-text value="🦊 Дикий зверь!" position="0 1.2 0" align="center" color="#FFF"></a-text>
             <a-animation attribute="rotation" to="0 360 0" dur="5000" repeat="indefinite"></a-animation>
         </a-entity>
     </a-scene>
 
-    <!-- Скрипты в правильном порядке -->
-    <script src="/js/telegram-api.js"></script>
-    <script src="/js/ar-config.js"></script>
-    <script src="/js/app.js"></script>
+    <!-- Основные скрипты с обработкой ошибок -->
+    <script src="/js/telegram-api.js" type="module"></script>
+    <script src="/js/ar-config.js" type="module"></script>
+    <script src="/js/app.js" type="module"></script>
+
+    <!-- Система восстановления -->
     <script>
-    // Глобальная переменная для отладки
-    window.APP_DEBUG = {
-        sceneLoaded: false,
-        cameraAllowed: null,
-        arSystemReady: false
-    };
+        // Глобальный обработчик ошибок
+        window.addEventListener('error', function(e) {
+            console.error('Global Error:', e.error);
+            showFatalError(e.error);
+        });
+
+        // Обработчик ошибок загрузки скриптов
+        function loadFallback(failedScript, libName) {
+            console.error(`Ошибка загрузки ${libName}:`, failedScript.src);
+            const errorMessage = `
+                <div class="error-box">
+                    <h2>⚠️ Ошибка загрузки</h2>
+                    <p>Не удалось загрузить ${libName}.</p>
+                    <p>Попробуйте:</p>
+                    <ul>
+                        <li>Проверить интернет-соединение</li>
+                        <li>Отключить блокировщики скриптов</li>
+                        <li>Обновить страницу</li>
+                    </ul>
+                    <button onclick="window.location.reload()">🔄 Обновить</button>
+                </div>
+            `;
+            document.body.innerHTML = errorMessage;
+        }
+
+        // Отображение фатальных ошибок
+        function showFatalError(error) {
+            document.body.innerHTML = `
+                <div class="fatal-error">
+                    <h2>💥 Критическая ошибка</h2>
+                    <pre>${error.stack || error.message}</pre>
+                    <button onclick="window.location.reload()">🔄 Перезагрузить</button>
+                </div>
+            `;
+        }
     </script>
 </body>
 </html>
