@@ -3,33 +3,36 @@ class Game {
         this.tg = new TelegramIntegration();
         this.ar = new ARConfig();
         this.initUI();
+        this.bindEvents();
     }
 
     initUI() {
         this.startButton = document.getElementById('startButton');
         this.status = document.getElementById('status');
-
-        this.startButton.addEventListener('click', () => this.startGame());
     }
 
-    async startGame() {
+    bindEvents() {
+        this.startButton.addEventListener('click', () => this.startAR());
+    }
+
+    async startAR() {
         try {
             this.startButton.disabled = true;
-            this.status.textContent = 'Инициализация камеры...';
-
+            this.status.textContent = 'Инициализация AR...';
+            
             await this.ar.initialize();
-
+            
             document.querySelector('.loader').classList.add('hidden');
             document.querySelector('a-scene').classList.remove('hidden');
+            
+            this.setupEventListeners();
 
-            this.setupAREvents();
-
-        } catch (error) {
+        } catch(error) {
             this.handleError(error);
         }
     }
 
-    setupAREvents() {
+    setupEventListeners() {
         this.ar.scene.addEventListener('arjs-plane-detected', () => {
             document.getElementById('animal').setAttribute('visible', 'true');
             this.status.classList.add('hidden');
@@ -37,25 +40,25 @@ class Game {
     }
 
     handleError(error) {
-        console.error('Game Error:', error);
+        console.error('AR Error:', error);
         this.status.innerHTML = `
-            Ошибка: ${error.name}<br>
-            ${this.errorMessage(error)}
+            ${this.getErrorMessage(error)}<br>
+            <button onclick="location.reload()">Перезагрузить</button>
         `;
-        this.startButton.disabled = false;
         this.ar.cleanup();
     }
 
-    errorMessage(error) {
+    getErrorMessage(error) {
         const messages = {
-            'NotAllowedError': 'Доступ к камере запрещен',
-            'NotFoundError': 'Камера не найдена',
-            'NotReadableError': 'Ошибка доступа к камере',
-            'OverconstrainedError': 'Неподдерживаемые параметры камеры'
+            'NotAllowedError': '🔒 Разрешите доступ к камере',
+            'NotFoundError': '📷 Камера не найдена',
+            'NotReadableError': '⚠️ Ошибка доступа к камере',
+            'OverconstrainedError': '🚫 Неподдерживаемые параметры',
+            'Error': `AR.js: ${error.message}`
         };
         return messages[error.name] || error.message;
     }
 }
 
-// Инициализация игры
-window.addEventListener('DOMContentLoaded', () => new Game());
+// Инициализация
+document.addEventListener('DOMContentLoaded', () => new Game());
