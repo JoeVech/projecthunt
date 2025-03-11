@@ -3,22 +3,19 @@ class Game {
         this.tg = new TelegramIntegration();
         this.ar = new ARConfig();
         this.initUI();
-        this.bindEvents();
     }
 
     initUI() {
         this.startButton = document.getElementById('startButton');
         this.status = document.getElementById('status');
-    }
-
-    bindEvents() {
+        
         this.startButton.addEventListener('click', () => this.startAR());
     }
 
     async startAR() {
         try {
             this.startButton.disabled = true;
-            this.status.textContent = 'Инициализация AR...';
+            this.status.textContent = 'Инициализация...';
             
             await this.ar.initialize();
             
@@ -34,31 +31,34 @@ class Game {
 
     setupEventListeners() {
         this.ar.scene.addEventListener('arjs-plane-detected', () => {
+            console.log('Plane detected!');
             document.getElementById('animal').setAttribute('visible', 'true');
             this.status.classList.add('hidden');
         });
     }
 
     handleError(error) {
-        console.error('AR Error:', error);
+        let message = 'Неизвестная ошибка';
+        
+        const errorMap = {
+            'NotAllowedError': 'Разрешите доступ к камере в настройках браузера',
+            'NotFoundError': 'Камера не найдена',
+            'NotReadableError': 'Ошибка доступа к камере',
+            'OverconstrainedError': 'Неподдерживаемые параметры камеры'
+        };
+
+        if (error.message.includes('AR.js system')) {
+            message = 'Ошибка AR системы. Перезагрузите страницу.';
+        } else {
+            message = errorMap[error.name] || error.message;
+        }
+
         this.status.innerHTML = `
-            ${this.getErrorMessage(error)}<br>
-            <button onclick="location.reload()">Перезагрузить</button>
+            <div class="error-message">
+                ${message}<br>
+                <button onclick="window.location.reload()">Перезагрузить</button>
+            </div>
         `;
         this.ar.cleanup();
     }
-
-    getErrorMessage(error) {
-        const messages = {
-            'NotAllowedError': '🔒 Разрешите доступ к камере',
-            'NotFoundError': '📷 Камера не найдена',
-            'NotReadableError': '⚠️ Ошибка доступа к камере',
-            'OverconstrainedError': '🚫 Неподдерживаемые параметры',
-            'Error': `AR.js: ${error.message}`
-        };
-        return messages[error.name] || error.message;
-    }
 }
-
-// Инициализация
-document.addEventListener('DOMContentLoaded', () => new Game());
