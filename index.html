@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Тест камеры</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #1a1a1a;
+        }
+
+        #videoContainer {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #video {
+            max-width: 100%;
+            max-height: 100%;
+        }
+
+        #status {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-family: Arial;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <div id="status">Проверка камеры...</div>
+    <div id="videoContainer">
+        <video id="video" autoplay playsinline></video>
+    </div>
+
+    <script>
+        // Инициализация Telegram Web App
+        Telegram.WebApp.ready();
+
+        // Элементы страницы
+        const video = document.getElementById('video');
+        const status = document.getElementById('status');
+
+        // Запрос доступа к камере
+        async function initCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: 'environment' // Используем заднюю камеру
+                    }
+                });
+
+                video.srcObject = stream;
+                status.textContent = "Камера работает! 🎥";
+
+                // Тест через 3 секунды
+                setTimeout(() => {
+                    status.textContent += "\nТест завершён успешно! ✅";
+                }, 3000);
+
+            } catch (error) {
+                status.textContent = `Ошибка: ${error.message}`;
+                console.error('Camera error:', error);
+            }
+        }
+
+        // Запускаем проверку
+        initCamera();
+    </script>
+</body>
+</html>
