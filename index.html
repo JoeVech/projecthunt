@@ -2,39 +2,33 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>AR Звери</title>
+    <title>AR Звери - Финал</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     
-    <!-- Минимальный CSP -->
+    <!-- Оптимизированный CSP -->
     <meta http-equiv="Content-Security-Policy" content="
         default-src 'self' 'unsafe-inline' data: blob:;
         script-src 'self' 'unsafe-inline' cdn.jsdelivr.net aframe.io;
         connect-src 'self' data: blob:;
         media-src 'self' blob: data:;
+        style-src 'self' 'unsafe-inline';
     ">
     
+    <!-- Зависимости -->
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@ar-js-org/ar.js@3.4.0/aframe/build/aframe-ar-nft.min.js"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
     <style>
-        body { 
+        body {
             margin: 0;
-            background: #000;
             overflow: hidden;
+            background: #000;
             touch-action: none;
-        }
-        
-        #cameraContainer {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: -1;
+            -webkit-tap-highlight-color: transparent;
         }
 
-        .loader {
+        #loader {
             position: fixed;
             top: 50%;
             left: 50%;
@@ -42,9 +36,10 @@
             color: white;
             text-align: center;
             z-index: 1000;
+            transition: opacity 0.3s;
         }
-        
-        #initButton {
+
+        #startButton {
             padding: 15px 30px;
             font-size: 18px;
             background: #0088cc;
@@ -52,131 +47,162 @@
             border: none;
             border-radius: 25px;
             cursor: pointer;
-            transition: 0.3s;
+            transition: transform 0.2s;
+        }
+
+        #startButton:active {
+            transform: scale(0.95);
+        }
+
+        #status {
+            margin: 15px 0;
+            font-size: 14px;
+            opacity: 0.8;
+        }
+
+        .hidden {
+            display: none !important;
         }
     </style>
 </head>
 <body>
-    <div class="loader">
-        <div id="status">👋 Нажмите кнопку для запуска</div>
-        <button id="initButton">Запустить AR-камеру</button>
+    <div id="loader">
+        <button id="startButton">Включить AR-камеру</button>
+        <div id="status">Ожидание действий пользователя...</div>
     </div>
-
-    <div id="cameraContainer"></div>
 
     <a-scene 
         vr-mode-ui="enabled: false"
         embedded 
         arjs="debugUIEnabled: false; trackingMethod: best;"
-        renderer="logarithmicDepthBuffer: true;"
-        style="display: none"
+        renderer="logarithmicDepthBuffer: true; precision: medium;"
+        class="hidden"
     >
-        <a-camera id="arCamera"></a-camera>
+        <a-camera id="arCamera" cursor="rayOrigin: mouse"></a-camera>
+        
+        <!-- Модель зверя -->
         <a-entity id="animal" arjs-anchor="detectedPlanes: true;" visible="false">
             <a-box position="0 0.5 0" color="#4CAF50" scale="0.5 0.5 0.5"></a-box>
+            <a-text 
+                value="Дикий зверь!" 
+                position="0 1.2 0" 
+                align="center" 
+                color="#FFF" 
+                scale="1.5 1.5 1.5"
+            ></a-text>
+            <a-animation 
+                attribute="rotation" 
+                to="0 360 0" 
+                dur="5000" 
+                repeat="indefinite"
+            ></a-animation>
         </a-entity>
     </a-scene>
 
     <script>
         (function() {
             const tg = window.Telegram?.WebApp;
-            const initButton = document.getElementById('initButton');
+            const loader = document.getElementById('loader');
+            const startButton = document.getElementById('startButton');
             const status = document.getElementById('status');
-            let arStream = null;
+            let mediaStream = null;
 
             // Инициализация Telegram WebApp
             if(tg) {
                 tg.ready();
                 tg.expand();
                 tg.enableClosingConfirmation();
+                document.body.style.backgroundColor = tg.themeParams.bg_color || '#000';
             }
 
-            // Основная функция инициализации
+            // Главная функция инициализации
             async function initializeAR() {
                 try {
                     // 1. Запрос доступа к камере
-                    status.innerHTML = '🔒 Запрос разрешения камеры...';
-                    const stream = await requestCameraAccess();
+                    status.textContent = 'Запрашиваем доступ к камере...';
+                    mediaStream = await navigator.mediaDevices.getUserMedia({
+                        video: {
+                            facingMode: 'environment',
+                            width: { ideal: 1280 },
+                            height: { ideal: 720 },
+                            frameRate: { ideal: 60 }
+                        }
+                    });
+
+                    // 2. Создание видео элемента
+                    const video = document.createElement('video');
+                    video.setAttribute('autoplay', '');
+                    video.setAttribute('playsinline', '');
+                    video.setAttribute('muted', '');
+                    video.srcObject = mediaStream;
                     
-                    // 2. Подготовка видеоэлемента
-                    status.innerHTML = '📷 Подключение камеры...';
-                    const video = await setupVideoElement(stream);
+                    await new Promise(resolve => {
+                        video.onloadedmetadata = () => {
+                            video.play();
+                            resolve();
+                        };
+                    });
+
+                    // 3. Инициализация AR сцены
+                    status.textContent = 'Инициализация AR...';
+                    const scene = document.querySelector('a-scene');
                     
-                    // 3. Инициализация AR-сцены
-                    status.innerHTML = '🚀 Запуск AR...';
-                    await initializeARScene(video);
+                    // Привязка видео к AR.js
+                    scene.systems['arjs']._arAnchorSystem.configuration = {
+                        sourceType: 'video',
+                        source: video,
+                        maxDetectionRate: 60,
+                        canvasWidth: video.videoWidth,
+                        canvasHeight: video.videoHeight
+                    };
+
+                    // Перезапуск AR системы
+                    scene.systems['arjs']._arAnchorSystem.stop();
+                    scene.systems['arjs']._arAnchorSystem.start();
+
+                    // 4. Показать сцену
+                    scene.classList.remove('hidden');
+                    loader.classList.add('hidden');
                     
-                    // 4. Финальная настройка
-                    document.querySelector('.loader').style.display = 'none';
-                    document.querySelector('a-scene').style.display = 'block';
-                    
+                    // 5. Обработка обнаружения плоскостей
+                    scene.addEventListener('arjs-plane-detected', () => {
+                        document.getElementById('animal').setAttribute('visible', 'true');
+                    });
+
                 } catch(error) {
                     handleError(error);
                 }
             }
 
-            // Запрос доступа к камере
-            async function requestCameraAccess() {
-                return navigator.mediaDevices.getUserMedia({
-                    video: {
-                        facingMode: 'environment',
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 },
-                        frameRate: { ideal: 60 }
-                    }
-                });
-            }
-
-            // Настройка видео элемента
-            async function setupVideoElement(stream) {
-                return new Promise((resolve) => {
-                    const video = document.createElement('video');
-                    video.setAttribute('autoplay', '');
-                    video.setAttribute('playsinline', '');
-                    video.setAttribute('muted', '');
-                    video.style.transform = 'scaleX(1)';
-                    video.style.width = '100%';
-                    video.style.height = '100%';
-                    video.style.objectFit = 'cover';
-                    video.srcObject = stream;
-                    
-                    video.onloadedmetadata = () => {
-                        video.play().then(() => resolve(video));
-                    };
-                    
-                    document.getElementById('cameraContainer').appendChild(video);
-                    arStream = stream;
-                });
-            }
-
-            // Инициализация AR сцены
-            async function initializeARScene(video) {
-                return new Promise((resolve) => {
-                    const scene = document.querySelector('a-scene');
-                    
-                    scene.addEventListener('loaded', () => {
-                        const arSystem = scene.systems['arjs'];
-                        arSystem._arAnchorSystem.configuration.source = video;
-                        arSystem._arAnchorSystem.configuration.sourceType = 'video';
-                        arSystem._arAnchorSystem.start();
-                        resolve();
-                    });
-                });
-            }
-
-            // Обработка ошибок
+            // Обработчик ошибок
             function handleError(error) {
-                console.error('Error:', error);
-                status.innerHTML = `❌ Ошибка: ${error.name || 'Unknown Error'}<br>${error.message}`;
-                initButton.style.display = 'block';
-                if(arStream) {
-                    arStream.getTracks().forEach(track => track.stop());
+                console.error('AR Error:', error);
+                status.innerHTML = `
+                    Ошибка: ${error.name}<br>
+                    ${getErrorMessage(error)}
+                `;
+                startButton.style.display = 'block';
+                
+                if(mediaStream) {
+                    mediaStream.getTracks().forEach(track => track.stop());
                 }
             }
 
+            // Понятные сообщения об ошибках
+            function getErrorMessage(error) {
+                const errors = {
+                    'NotAllowedError': 'Разрешите доступ к камере в настройках браузера',
+                    'NotFoundError': 'Камера не найдена',
+                    'NotReadableError': 'Невозможно получить доступ к камере',
+                    'OverconstrainedError': 'Неподдерживаемые параметры камеры',
+                    'AbortError': 'Операция прервана'
+                };
+                return errors[error.name] || error.message;
+            }
+
             // Запуск по кнопке
-            initButton.addEventListener('click', () => {
-                initButton.style.display = 'none';
+            startButton.addEventListener('click', () => {
+                startButton.style.display = 'none';
                 initializeAR();
             });
 
@@ -184,6 +210,13 @@
             if(!/Mobi|Android/i.test(navigator.userAgent)) {
                 initializeAR();
             }
+
+            // Очистка при закрытии
+            window.addEventListener('beforeunload', () => {
+                if(mediaStream) {
+                    mediaStream.getTracks().forEach(track => track.stop());
+                }
+            });
         })();
     </script>
 </body>
