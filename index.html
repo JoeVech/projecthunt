@@ -3,7 +3,6 @@
 <head>
     <title>GeoHunter</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <style>
         body {
             margin: 0;
@@ -27,54 +26,97 @@
             cursor: pointer;
         }
     </style>
+    <!-- Локальная версия OpenLayers -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.5.0/css/ol.css">
+    <script src="https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.5.0/build/ol.js"></script>
 </head>
 <body>
     <div id="map"></div>
     <button class="refresh-btn" onclick="updatePosition()">🔄 Обновить</button>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        // Инициализация карты
         let map;
         let playerMarker;
-        
+        const tileProviders = [
+            {
+                name: 'OpenStreetMap',
+                url: 'https://{a-c}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+            },
+            {
+                name: 'CARTO',
+                url: 'https://{a-c}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
+            },
+            {
+                name: 'CyclOSM',
+                url: 'https://{a-c}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png'
+            }
+        ];
+        let currentTile = 0;
+
         function initMap(lat, lon) {
-            map = L.map('map').setView([lat, lon], 15);
-            
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                maxZoom: 19,
-                attribution: '© OpenStreetMap'
-            }).addTo(map);
+            map = new ol.Map({
+                target: 'map',
+                layers: [
+                    new ol.layer.Tile({
+                        source: new ol.source.XYZ({
+                            url: tileProviders[currentTile].url
+                        })
+                    })
+                ],
+                view: new ol.View({
+                    center: ol.proj.fromLonLat([lon, lat]),
+                    zoom: 15
+                })
+            });
 
             // Маркер игрока
-            playerMarker = L.marker([lat, lon], {
-                icon: L.icon({
-                    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
-                    iconSize: [25, 41],
-                    iconAnchor: [12, 41]
+            playerMarker = new ol.layer.Vector({
+                source: new ol.source.Vector(),
+                style: new ol.style.Style({
+                    image: new ol.style.Icon({
+                        src: 'https://docs.maptiler.com/openlayers/default-marker.png',
+                        scale: 0.8
+                    })
                 })
-            }).addTo(map);
+            });
+            map.addLayer(playerMarker);
+            updatePosition(lat, lon);
         }
 
-        // Обновление позиции
         function updatePosition() {
             navigator.geolocation.getCurrentPosition(pos => {
-                const {latitude, longitude} = pos.coords;
-                map.setView([latitude, longitude], 15);
-                playerMarker.setLatLng([latitude, longitude]);
+                const lat = pos.coords.latitude;
+                const lon = pos.coords.longitude;
+                
+                const newPos = ol.proj.fromLonLat([lon, lat]);
+                map.getView().setCenter(newPos);
+                
+                playerMarker.getSource().clear();
+                playerMarker.getSource().addFeature(
+                    new ol.Feature(new ol.geom.Point(newPos))
+                );
+
             }, error => {
-                alert(`Ошибка: ${error.message}`);
+                console.error('Geolocation error:', error);
+                try {
+                    // Автоматическое переключение тайлов при ошибке
+                    currentTile = (currentTile + 1) % tileProviders.length;
+                    map.getLayers().item(0).setSource(
+                        new ol.source.XYZ({ url: tileProviders[currentTile].url })
+                    );
+                } catch(e) {
+                    document.getElementById('map').innerHTML = 
+                        '<p style="padding:20px">Карта недоступна. Проверьте интернет-соединение.</p>';
+                }
             });
         }
 
-        // Инициализация при загрузке
+        // Инициализация
         Telegram.WebApp.ready();
         navigator.geolocation.getCurrentPosition(pos => {
             initMap(pos.coords.latitude, pos.coords.longitude);
-        }, error => {
-            // Fallback для тестирования
-            initMap(44.9482, 34.1003); // Координаты Симферополя
-            alert('Геолокация отключена. Используем тестовые координаты.');
+        }, () => {
+            initMap(44.9482, 34.1003); // Fallback координаты
         });
     </script>
 </body>
