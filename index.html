@@ -40,6 +40,8 @@
         const tileProviders = [
             {
                 name: 'OpenStreetMap',
+                const PROXY_URL = 'https://cors-anywhere.herokuapp.com/'; // Добавить перед url
+                url: PROXY_URL + tileProviders[currentTile].url
                 url: 'https://{a-c}.tile.openstreetmap.org/{z}/{x}/{y}.png'
             },
             {
