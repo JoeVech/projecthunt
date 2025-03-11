@@ -1,76 +1,96 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Тест камеры</title>
+    <title>AR Camera</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
-        body {
-            margin: 0;
+        /* Полноэкранные стили */
+        body { 
+            margin: 0; 
             overflow: hidden;
-            background: #1a1a1a;
+            background: #000;
         }
-
-        #videoContainer {
+        
+        #arScene {
             width: 100vw;
             height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-
-        #video {
-            max-width: 100%;
-            max-height: 100%;
-        }
-
-        #status {
             position: fixed;
-            top: 20px;
-            left: 20px;
+            top: 0;
+            left: 0;
+        }
+
+        .loader {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
             color: white;
             font-family: Arial;
+            text-align: center;
             z-index: 1000;
         }
     </style>
+
+    <!-- Блокировка Web3 расширений -->
+    <script>
+        (function() {
+            const disableWeb3 = () => {
+                delete window.ethereum;
+                delete window.web3;
+                Object.defineProperties(window, {
+                    ethereum: { get: () => undefined },
+                    web3: { get: () => undefined }
+                });
+            };
+            
+            if (document.readyState === 'complete') disableWeb3();
+            else window.addEventListener('load', disableWeb3);
+        })();
+    </script>
+
+    <!-- Библиотеки -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.2.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@ar-js-org/ar.js@3.4.0/aframe/build/aframe-ar.min.js"></script>
 </head>
 <body>
-    <div id="status">Проверка камеры...</div>
-    <div id="videoContainer">
-        <video id="video" autoplay playsinline></video>
-    </div>
+    <div class="loader" id="loader">Инициализация AR...</div>
+    
+    <a-scene 
+        id="arScene"
+        vr-mode-ui="enabled: false"
+        embedded 
+        arjs="sourceType: webcam; debugUIEnabled: false;"
+    >
+        <a-camera gps-camera rotation-reader></a-camera>
+        <a-box position="0 0 -2" color="#4CC3D9" scale="0.5 0.5 0.5"></a-box>
+    </a-scene>
 
     <script>
-        // Инициализация Telegram Web App
-        Telegram.WebApp.ready();
-
-        // Элементы страницы
-        const video = document.getElementById('video');
-        const status = document.getElementById('status');
-
-        // Запрос доступа к камере
-        async function initCamera() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        facingMode: 'environment' // Используем заднюю камеру
-                    }
-                });
-
-                video.srcObject = stream;
-                status.textContent = "Камера работает! 🎥";
-
-                // Тест через 3 секунды
-                setTimeout(() => {
-                    status.textContent += "\nТест завершён успешно! ✅";
-                }, 3000);
-
-            } catch (error) {
-                status.textContent = `Ошибка: ${error.message}`;
-                console.error('Camera error:', error);
-            }
+        // Инициализация только внутри Telegram Web App
+        if (typeof Telegram !== 'undefined' && Telegram.WebApp) {
+            Telegram.WebApp.ready();
+            Telegram.WebApp.expand();
         }
 
-        // Запускаем проверку
-        initCamera();
+        // Обработка загрузки сцены
+        document.querySelector('a-scene').addEventListener('loaded', () => {
+            document.getElementById('loader').style.display = 'none';
+        });
+
+        // Обработка ошибок камеры
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .catch(error => {
+                const loader = document.getElementById('loader');
+                loader.innerHTML = `
+                    <div style="color: red">
+                        Ошибка доступа к камере!<br>
+                        ${error.name}: ${error.message}<br>
+                        Пожалуйста:<br>
+                        1. Проверьте разрешения<br>
+                        2. Перезагрузите страницу
+                    </div>
+                `;
+            });
     </script>
 </body>
 </html>
