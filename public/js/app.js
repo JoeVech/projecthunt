@@ -1,130 +1,156 @@
 class Game {
     constructor() {
-        this.initDebugTools();
-        this.tg = new TelegramIntegration();
-        this.ar = new ARConfig();
-        this.initUI();
+        this.initConstants();
+        this.initElements();
+        this.initEventListeners();
+        this.initDebugger();
+        this.checkDependencies();
+        this.tgIntegration = new TelegramIntegration();
+        this.arConfig = new ARConfig();
     }
 
-    initDebugTools() {
-        window.appDebug = {
-            log: (message) => {
-                const timestamp = new Date().toISOString().substr(11, 12);
-                console.log(`[${timestamp}] DEBUG: ${message}`);
-            },
-            showForceReload: () => {
-                const btn = document.createElement('button');
-                btn.textContent = 'Экстренная перезагрузка';
-                btn.style.position = 'fixed';
-                btn.style.bottom = '20px';
-                btn.style.right = '20px';
-                btn.style.zIndex = 10000;
-                btn.onclick = () => window.location.reload();
-                document.body.appendChild(btn);
+    initConstants() {
+        this.constants = {
+            LOADING_DELAY: 5000,
+            ERROR_MESSAGES: {
+                NO_AFRAME: 'Требуется A-Frame. Обновите страницу.',
+                NO_ARJS: 'AR.js не загружен. Проверьте интернет.',
+                NO_CAMERA: 'Доступ к камере запрещен.',
+                INIT_TIMEOUT: 'Превышено время инициализации.',
+                UNKNOWN_ERROR: 'Неизвестная ошибка.'
             }
         };
     }
 
-    initUI() {
-        this.startButton = document.getElementById('startButton');
-        this.status = document.getElementById('status');
-        
-        this.startButton.onclick = () => {
-            window.appDebug.log('Кнопка активации нажата');
-            this.startAR();
+    initElements() {
+        this.elements = {
+            loader: document.querySelector('.loader'),
+            startButton: document.getElementById('startButton'),
+            status: document.getElementById('status'),
+            scene: document.querySelector('a-scene'),
+            animal: document.getElementById('animal'),
+            spinner: document.querySelector('.loading-spinner')
         };
+    }
+
+    initEventListeners() {
+        this.elements.startButton.addEventListener('click', () => this.startAR());
+        window.addEventListener('beforeunload', () => this.cleanup());
+    }
+
+    initDebugger() {
+        window.appDebug = {
+            log: (message) => console.log(`[DEBUG][${new Date().toISOString()}] ${message}`),
+            state: () => ({
+                aframe: !!window.AFRAME,
+                arjs: !!window.ARjs,
+                sceneReady: this.elements.scene.getAttribute('data-loaded') === 'true',
+                cameraAccess: navigator.mediaDevices ? true : false
+            })
+        };
+    }
+
+    async checkDependencies() {
+        return new Promise((resolve, reject) => {
+            const checkInterval = setInterval(() => {
+                const { aframe, arjs } = window.appDebug.state();
+                
+                if (aframe && arjs) {
+                    clearInterval(checkInterval);
+                    resolve();
+                }
+            }, 100);
+        });
     }
 
     async startAR() {
         try {
-            window.appDebug.showForceReload();
-            this.lockUI();
+            this.setLoadingState(true);
+            await this.validatePrerequisites();
+            await this.arConfig.initialize();
+            this.initARSession();
             
-            window.appDebug.log('Начало инициализации AR');
-            await this.ar.initialize();
-            
-            window.appDebug.log('AR успешно инициализирован');
-            this.showScene();
-            
-            this.setupEventListeners();
-
-        } catch(error) {
-            window.appDebug.log(`Ошибка инициализации: ${error.message}`);
+        } catch (error) {
             this.handleError(error);
         }
     }
 
-    lockUI() {
-        this.startButton.disabled = true;
-        this.status.textContent = 'Инициализация...';
-        this.status.style.color = 'yellow';
+    async validatePrerequisites() {
+        const { aframe, arjs, cameraAccess } = window.appDebug.state();
+        
+        if (!aframe) throw new Error(this.constants.ERROR_MESSAGES.NO_AFRAME);
+        if (!arjs) throw new Error(this.constants.ERROR_MESSAGES.NO_ARJS);
+        if (!cameraAccess) throw new Error(this.constants.ERROR_MESSAGES.NO_CAMERA);
     }
 
-    showScene() {
-        document.querySelector('.loader').classList.add('hidden');
-        document.querySelector('a-scene').classList.remove('hidden');
-        this.status.textContent = 'Ищите плоскую поверхность...';
-        this.status.style.color = 'white';
+    setLoadingState(loading) {
+        this.elements.startButton.disabled = loading;
+        this.elements.spinner.classList.toggle('hidden', !loading);
+        this.elements.status.textContent = loading 
+            ? 'Инициализация AR...' 
+            : 'Готов к работе!';
     }
 
-    setupEventListeners() {
-        this.ar.scene.addEventListener('arjs-plane-detected', () => {
-            window.appDebug.log('Плоскость обнаружена');
-            document.getElementById('animal').setAttribute('visible', 'true');
-            this.status.classList.add('hidden');
+    initARSession() {
+        this.elements.scene.addEventListener('loaded', () => {
+            this.elements.scene.setAttribute('data-loaded', 'true');
+            this.elements.loader.classList.add('hidden');
+            this.elements.scene.classList.remove('hidden');
+            this.setupARTracking();
+        });
+    }
+
+    setupARTracking() {
+        let timeout = setTimeout(() => {
+            this.handleError(new Error(this.constants.ERROR_MESSAGES.INIT_TIMEOUT));
+        }, this.constants.LOADING_DELAY);
+
+        this.elements.scene.addEventListener('arjs-plane-detected', () => {
+            clearTimeout(timeout);
+            this.elements.animal.setAttribute('visible', 'true');
+            this.elements.status.classList.add('hidden');
         });
     }
 
     handleError(error) {
-        console.error('Critical Error:', error);
-        this.status.innerHTML = this.getErrorMessageHtml(error);
-        this.status.style.color = 'red';
-        this.ar.cleanup();
+        console.error('AR Error:', error);
+        this.setLoadingState(false);
+        this.showErrorOverlay(error);
+        this.cleanup();
     }
 
-    getErrorMessageHtml(error) {
-        const messages = {
-            'NotAllowedError': `
-                <div class="error-header">🔐 Требуется доступ к камере</div>
-                <div class="error-description">
-                    1. Нажмите на иконку замка в адресной строке<br>
-                    2. Выберите "Настройки сайта"<br>
-                    3. Разрешите доступ к камере
-                </div>
-            `,
-            'TimeoutError': `
-                <div class="error-header">⏳ Таймаут инициализации</div>
-                <div class="error-description">
-                    Попробуйте:<br>
-                    1. Перезагрузить страницу<br>
-                    2. Проверить интернет-соединение<br>
-                    3. Закрыть другие приложения, использующие камеру
-                </div>
-            `,
-            'default': `
-                <div class="error-header">⚠️ Критическая ошибка</div>
-                <div class="error-description">
-                    ${error.message}<br>
-                    Код ошибки: ${error.name}
-                </div>
-            `
-        };
-
-        return `
-            <div class="error-container">
-                ${messages[error.name] || messages.default}
-                <button class="retry-button" onclick="window.location.reload()">
-                    ⟳ Попробовать снова
-                </button>
-                <div class="debug-info">
-                    ${JSON.stringify(window.APP_DEBUG, null, 2)}
+    showErrorOverlay(error) {
+        const errorMessage = error.message || this.constants.ERROR_MESSAGES.UNKNOWN_ERROR;
+        document.body.innerHTML = `
+            <div class="error-overlay">
+                <div class="error-content">
+                    <h2>🚨 Ошибка AR</h2>
+                    <p>${errorMessage}</p>
+                    <div class="error-actions">
+                        <button onclick="window.location.reload()">⟳ Обновить</button>
+                        ${this.tgIntegration.isWebApp ? 
+                            `<button onclick="Telegram.WebApp.close()">✖️ Закрыть</button>` : ''}
+                    </div>
+                    <details class="error-details">
+                        <summary>Техническая информация</summary>
+                        <pre>${error.stack || 'Нет дополнительной информации'}</pre>
+                    </details>
                 </div>
             </div>
         `;
     }
+
+    cleanup() {
+        if (this.arConfig) {
+            this.arConfig.cleanup();
+        }
+        window.appDebug.log('Ресурсы очищены');
+    }
 }
 
+// Инициализация приложения
 document.addEventListener('DOMContentLoaded', () => {
-    new Game();
-    console.log('APP_DEBUG:', window.APP_DEBUG);
+    const game = new Game();
+    window.app = game;
+    window.appDebug.log('Приложение инициализировано');
 });
