@@ -5,49 +5,36 @@
     <title>AR Звери</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
-    <!-- Content Security Policy -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' cdn.jsdelivr.net aframe.io; script-src 'self' 'unsafe-inline' 'unsafe-eval' cdn.jsdelivr.net aframe.io; connect-src 'self' blob:;">
+    <!-- Обновленный CSP -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' cdn.jsdelivr.net aframe.io blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' cdn.jsdelivr.net aframe.io; connect-src 'self' blob:; media-src 'self' blob:;">
     
-    <!-- AR зависимости -->
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@ar-js-org/ar.js@3.4.0/aframe/build/aframe-ar.min.js"></script>
 
     <style>
-        body { 
-            margin: 0; 
-            overflow: hidden;
-            background: #000;
-        }
-        
-        .arjs-loader {
+        /* Добавлены стили для кнопки активации камеры */
+        #cameraButton {
             position: fixed;
-            top: 50%;
+            bottom: 20px;
             left: 50%;
-            transform: translate(-50%, -50%);
+            transform: translateX(-50%);
+            z-index: 1002;
+            padding: 12px 24px;
+            background: #0088cc;
             color: white;
-            font-family: Arial;
-            z-index: 1000;
-            background: rgba(0,0,0,0.8);
-            padding: 20px;
-            border-radius: 10px;
-        }
-        
-        #status {
-            position: fixed;
-            top: 20px;
-            left: 20px;
-            color: white;
-            font-family: Arial;
-            z-index: 1001;
-            background: rgba(0,0,0,0.7);
-            padding: 10px;
-            border-radius: 5px;
+            border: none;
+            border-radius: 25px;
+            font-size: 16px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            display: none;
         }
     </style>
 </head>
 <body>
     <div class="arjs-loader">Инициализация AR...</div>
-    <div id="status">Поиск плоскостей...</div>
+    <div id="status">Для начала нажмите "Активировать камеру"</div>
+    <button id="cameraButton">Активировать камеру</button>
 
     <a-scene 
         vr-mode-ui="enabled: false"
@@ -55,95 +42,85 @@
         arjs="sourceType: webcam; debugUIEnabled: false; trackingMethod: best;"
         renderer="logarithmicDepthBuffer: true;"
     >
-        <a-camera 
-            gps-camera 
-            rotation-reader
-            wasd-controls-enabled="false"
-        ></a-camera>
-
+        <a-camera gps-camera rotation-reader></a-camera>
+        
         <!-- Пример зверя -->
-        <a-entity 
-            arjs-anchor="detectedPlanes: true;"
-            visible="false"
-        >
-            <a-box 
-                position="0 0.5 0"
-                color="#4CAF50"
-                scale="0.5 0.5 0.5"
-            ></a-box>
-            <a-text 
-                value="Лесной зверь"
-                position="0 1.2 0"
-                align="center"
-                color="#FFF"
-                scale="2 2 2"
-            ></a-text>
-            <a-animation 
-                attribute="rotation"
-                to="0 360 0"
-                dur="5000"
-                repeat="indefinite"
-            ></a-animation>
+        <a-entity arjs-anchor="detectedPlanes: true;" visible="false">
+            <a-box position="0 0.5 0" color="#4CAF50" scale="0.5 0.5 0.5"></a-box>
+            <a-text value="Лесной зверь" position="0 1.2 0" align="center" color="#FFF" scale="2 2 2"></a-text>
+            <a-animation attribute="rotation" to="0 360 0" dur="5000" repeat="indefinite"></a-animation>
         </a-entity>
     </a-scene>
 
     <script>
         (function() {
-            // Блокировка Web3 API
-            const disableWeb3 = () => {
-                const props = ['ethereum', 'web3', 'BinanceChain'];
-                props.forEach(prop => delete window[prop]);
-                props.forEach(prop => {
-                    Object.defineProperty(window, prop, {
-                        get: () => undefined,
-                        configurable: false
-                    });
-                });
-            };
-            
-            disableWeb3();
-            setInterval(disableWeb3, 1000);
-
-            // Инициализация сцены
-            document.querySelector('a-scene').addEventListener('loaded', () => {
-                const loader = document.querySelector('.arjs-loader');
-                const status = document.getElementById('status');
-                
-                loader.style.display = 'none';
-                status.textContent = 'Ищите плоскости поверхностей!';
-
-                // Настройка видео
-                const video = document.querySelector('video');
-                if(video) {
-                    video.style.transform = 'scaleX(1)';
-                    video.style.position = 'fixed';
-                    video.style.objectFit = 'cover';
-                }
-            });
-
-            // Обработка событий AR
-            window.addEventListener('arjs-anchor-clicked', (event) => {
-                console.log('Зверь пойман!', event.detail.target);
-                // Здесь можно добавить логику поимки зверя
-            });
-
-            // Интеграция с Telegram
+            // Инициализация Telegram WebApp
             if(typeof Telegram !== 'undefined') {
                 Telegram.WebApp.ready();
                 Telegram.WebApp.expand();
                 Telegram.WebApp.enableClosingConfirmation();
-                
-                // Оптимизация для мобильных устройств
-                if(Telegram.WebApp.isExpanded) {
-                    document.documentElement.style.height = '100%';
-                    document.body.style.height = '100%';
-                }
             }
 
-            // Автоматический ресайз
-            window.addEventListener('resize', () => {
+            const cameraButton = document.getElementById('cameraButton');
+            const status = document.getElementById('status');
+            
+            // Показываем кнопку активации камеры
+            cameraButton.style.display = 'block';
+
+            // Обработчик активации камеры
+            cameraButton.addEventListener('click', async () => {
+                try {
+                    status.textContent = 'Запрос доступа к камере...';
+                    
+                    // Явный запрос разрешения
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        video: {
+                            facingMode: 'environment',
+                            width: { ideal: 1280 },
+                            height: { ideal: 720 }
+                        }
+                    });
+
+                    // Инициализация AR после получения потока
+                    initAR(stream);
+                    cameraButton.style.display = 'none';
+                    status.textContent = 'Ищите плоскости поверхностей!';
+
+                } catch (error) {
+                    status.innerHTML = `Ошибка доступа к камере:<br>${error.message}`;
+                    cameraButton.textContent = 'Повторить попытку';
+                }
+            });
+
+            // Функция инициализации AR
+            function initAR(stream) {
                 const scene = document.querySelector('a-scene');
-                if(scene) scene.emit('resize');
+                const video = document.createElement('video');
+                
+                video.srcObject = stream;
+                video.setAttribute('autoplay', '');
+                video.setAttribute('playsinline', '');
+                video.style.display = 'none';
+                document.body.appendChild(video);
+
+                // Обновление источника камеры для AR.js
+                scene.systems['arjs']._arAnchorSystem.configuration.sourceParameters.source = video;
+                scene.systems['arjs']._arAnchorSystem.configuration.sourceParameters.sourceType = 'video';
+
+                // Принудительный рестарт системы AR
+                scene.systems['arjs']._arAnchorSystem.start();
+                
+                // Скрытие лоадера
+                document.querySelector('.arjs-loader').style.display = 'none';
+            }
+
+            // Обработка ошибок AR
+            window.addEventListener('arjs-video-loaded', () => {
+                console.log('AR видео успешно загружено');
+            });
+
+            window.addEventListener('arjs-source-error', (error) => {
+                status.innerHTML = `Ошибка AR:<br>${error.detail.error.message}`;
             });
         })();
     </script>
