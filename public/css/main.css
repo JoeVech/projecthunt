@@ -37,3 +37,33 @@
     opacity: 0.7;
     word-break: break-all;
 }
+
+.fatal-error {
+    padding: 20px;
+    background: #ffebee;
+    color: #b71c1c;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    overflow-y: auto;
+    z-index: 9999;
+}
+
+.fatal-error pre {
+    background: rgba(0,0,0,0.1);
+    padding: 10px;
+    border-radius: 5px;
+    overflow-x: auto;
+}
+
+.fatal-error button {
+    margin-top: 20px;
+    padding: 12px 24px;
+    background: #d32f2f;
+    color: white;
+    border: none;
+    border-radius: 25px;
+    cursor: pointer;
+}
